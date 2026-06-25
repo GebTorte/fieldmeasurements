@@ -5,7 +5,7 @@ import pandas as pd
 
 # 1 load s2 raster image
 fp = Path("/home/feds/Data/S2_file.tif")
-scale_val = 10_000
+scale_val = 10_000 # todo adapt L2A refl scale to formula in https://sentiwiki.copernicus.eu/web/s2-products#:~:text=L2A%5FSRi%20%3D%20%28L2A%5FDNi%20%2B%20BOA%5FADD%5FOFFSETi%29%20%2F%20QUANTIFICATION%5FVALUE
 
 with rio.open(fp) as dataset:
     r = b4 = dataset.read(1) /scale_val# r
@@ -29,7 +29,7 @@ df = gpd.read_file(df_fp)
 # or 
 #df = pd.read_csv(df_fp)
 # 2.1.1 transform df to gdf via gpd.points_from_xy(df.Long, df.Lat)
-# 2.1.2 or find a way to join
+# 2.1.2 or find a way to (inner) join
 
 # 3 extract s2 pixels corresponding to sample points
 
