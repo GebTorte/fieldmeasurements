@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from datetime import date
 
 
-def calc_indices_for_sample(lst: list):
+def calc_indices_for_sample(lst: list, e:float = 1e8):
     """
     samples in order of bands
     r     - 1
@@ -16,12 +16,11 @@ def calc_indices_for_sample(lst: list):
     redge - 5
     """
     r, g, b, nir, redge = lst
-
     # 1.1 calc indices for selected pixels
-    ndvi = (nir - r) / (nir + r + 1e-8)  # avoid division by zero
+    ndvi = (nir - r) / (nir + r + e)  # avoid division by zero
     evi = 2.5 * (nir - r) / (nir + 6 * r - 7.5 * b + 1)
     mcari = ((redge - r) - 0.2 * (redge - g)) * (
-        redge / r
+        redge / (r + e)
     )  # (Modified Chlorophyll Absorption in Reflectance Index)
 
     # todo add biomass estimate index
@@ -39,9 +38,11 @@ df2 = pd.DataFrame(df)  # convert to pd for joining
 # fix csv by opening in libre office excel and exporting as csv again
 csv_fp = Path("./data/Grassland_fixed.csv")
 csv_df = pd.read_csv(csv_fp)[1:]  # skip nan row
-csv_df["Plot_ID"] = csv_df["Plot ID"]  # rename
+csv_df["Plot_ID"] = csv_df["Plot ID"]  # rename for join
 
-df_joined = df2.join(csv_df, on="Plot_ID", lsuffix="_left", rsuffix="_right")
+rsuffix = "_csv"
+lsuffix = "_grid"
+df_joined = df2.join(csv_df, on="Plot_ID", lsuffix=lsuffix, rsuffix=rsuffix)
 # or
 # df = pd.read_csv(df_fp)
 # 2.1.1 transform df to gdf via gpd.points_from_xy(df.Long, df.Lat)
@@ -59,10 +60,18 @@ df_joined = df2.join(csv_df, on="Plot_ID", lsuffix="_left", rsuffix="_right")
 # image from 2026-06-22 10:36
 # > gdal_translate -of GPKG <input-file>.tif <output-file>.gpkg # <-- only works for up to 4 bands...
 sat_date = date(2026, 6, 22)
+sample_dates = [date(2026, 6, 23), date(2026, 6, 24)]
 fp = Path("/home/feds/projects/fieldmeasurements/data/s2/Sentinel2_2026-06-23.tif")
 # scale_val = 10_000 # todo adapt L2A refl scale to c1,c2 formula in https://sentiwiki.copernicus.eu/web/s2-products#:~:text=L2A%5FSRi%20%3D%20%28L2A%5FDNi%20%2B%20BOA%5FADD%5FOFFSETi%29%20%2F%20QUANTIFICATION%5FVALUE
 
+# back to gdf
 gdf = gpd.GeoDataFrame(df_joined, geometry="geometry")
+
+# filter for date-relevant plot ids
+gdf = gdf[gdf[f"Plot_ID{rsuffix}"].isin(range(132, 142))]
+# or filter for dates (first clean csv dates...)
+#gdf["Date"] = pd.to_datetime(gdf["Date"], format="%d.%m.%Y")
+#gdf = gdf[gdf["Date"].isin(sample_dates)]
 
 with rio.open(fp) as src:
     # unify crs
@@ -98,4 +107,6 @@ with rio.open(fp) as src:
     gdf["mcari"] = [r["mcari"] for r in results]
 
 # export to file
-gdf.to_file(f"./data/processed/results_{sat_date}.gpkg")
+gdf.to_file(f"./data/processed/results_{sat_date}_small.gpkg")
+
+gdf.plot(column="ndvi")
