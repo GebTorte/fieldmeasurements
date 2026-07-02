@@ -18,44 +18,41 @@ def calc_indices_for_sample(lst: list):
     r, g, b, nir, redge = lst
 
     # 1.1 calc indices for selected pixels
-    ndvi = (nir - r) / (nir + r + 1e-8) # avoid division by zero
+    ndvi = (nir - r) / (nir + r + 1e-8)  # avoid division by zero
     evi = 2.5 * (nir - r) / (nir + 6 * r - 7.5 * b + 1)
-    mcari = ((redge - r) - 0.2 * (redge - g)) * (redge / r) # (Modified Chlorophyll Absorption in Reflectance Index) 
-    
+    mcari = ((redge - r) - 0.2 * (redge - g)) * (
+        redge / r
+    )  # (Modified Chlorophyll Absorption in Reflectance Index)
+
     # todo add biomass estimate index
 
-    return {
-        "ndvi": ndvi,
-        "evi": evi,
-        "mcari": mcari
-    }
+    return {"ndvi": ndvi, "evi": evi, "mcari": mcari}
 
 
-
-# 2 load data from Daniel (point/pixel id?) 
+# 2 load data from Daniel (point/pixel id?)
 # file format gpkg or csv?
-#df_fp = Path("./data/wrzburg_s2_grid_centroid.gpkg")
+# df_fp = Path("./data/wrzburg_s2_grid_centroid.gpkg")
 df_fp = Path("./data/wrzburg__s2_grid.gpkg")
 df = gpd.read_file(df_fp).dropna()
-df2 = pd.DataFrame(df)# convert to pd for joining
+df2 = pd.DataFrame(df)  # convert to pd for joining
 
 # fix csv by opening in libre office excel and exporting as csv again
 csv_fp = Path("./data/Grassland_fixed.csv")
-csv_df = pd.read_csv(csv_fp)[1:] # skip nan row
-csv_df["Plot_ID"] = csv_df["Plot ID"] # rename
+csv_df = pd.read_csv(csv_fp)[1:]  # skip nan row
+csv_df["Plot_ID"] = csv_df["Plot ID"]  # rename
 
 df_joined = df2.join(csv_df, on="Plot_ID", lsuffix="_left", rsuffix="_right")
-# or 
-#df = pd.read_csv(df_fp)
+# or
+# df = pd.read_csv(df_fp)
 # 2.1.1 transform df to gdf via gpd.points_from_xy(df.Long, df.Lat)
 # 2.1.2 or find a way to (inner) join
 
-#view sorted
+# view sorted
 # df_joined.sort_values("Plot_ID")
 
-# optionally save 
-#df_joined.to_parquet("./data/processed/df_combined.parquet")
-#df_joined.to_csv("./data/processed/df_combined.csv")
+# optionally save
+# df_joined.to_parquet("./data/processed/df_combined.parquet")
+# df_joined.to_csv("./data/processed/df_combined.csv")
 
 ################################################
 # load s2 raster image
@@ -71,12 +68,12 @@ with rio.open(fp) as src:
     # unify crs
     if gdf.crs != src.crs:
         gdf = gdf.to_crs(src.crs)
-    
-    #r = b4 = src.read(1).astype('float64') #/scale_val# r
-    #g = b3 = src.read(2).astype('float64') #/scale_val# g
-    #b = b2 = src.read(3).astype('float64') #/scale_val# b
-    #nir = b8 = src.read(4).astype('float64') #/scale_val# nir
-    #redge = b5 = src.read(5).astype('float64') #/scale_val
+
+    # r = b4 = src.read(1).astype('float64') #/scale_val# r
+    # g = b3 = src.read(2).astype('float64') #/scale_val# g
+    # b = b2 = src.read(3).astype('float64') #/scale_val# b
+    # nir = b8 = src.read(4).astype('float64') #/scale_val# nir
+    # redge = b5 = src.read(5).astype('float64') #/scale_val
 
     # preview ndvi
     # plt.imshow(ndvi, "Greens")
@@ -88,15 +85,17 @@ with rio.open(fp) as src:
 
     # Sample the raster at all points
     # - extract values for centroid points
-    samples = list(src.sample(coords)) # assuming sample returns band samples in order of bands
+    samples = list(
+        src.sample(coords)
+    )  # assuming sample returns band samples in order of bands
 
     results = []
     for s in samples:
         results.append(calc_indices_for_sample(s))
 
-    gdf['ndvi'] = [r['ndvi'] for r in results]
-    gdf['evi']  = [r['evi'] for r in results]
-    gdf['mcari'] = [r['mcari'] for r in results]
+    gdf["ndvi"] = [r["ndvi"] for r in results]
+    gdf["evi"] = [r["evi"] for r in results]
+    gdf["mcari"] = [r["mcari"] for r in results]
 
 # export to file
 gdf.to_file(f"./data/processed/results_{sat_date}.gpkg")
