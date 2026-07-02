@@ -2,7 +2,6 @@ import geopandas as gpd
 import rasterio as rio
 from pathlib import Path
 import pandas as pd
-import polars as pl
 import matplotlib.pyplot as plt
 from datetime import date
 
@@ -35,7 +34,8 @@ def calc_indices_for_sample(lst: list):
 
 # 2 load data from Daniel (point/pixel id?) 
 # file format gpkg or csv?
-df_fp = Path("./data/wrzburg_s2_grid_centroid.gpkg")
+#df_fp = Path("./data/wrzburg_s2_grid_centroid.gpkg")
+df_fp = Path("./data/wrzburg__s2_grid.gpkg")
 df = gpd.read_file(df_fp).dropna()
 df2 = pd.DataFrame(df)# convert to pd for joining
 
@@ -60,16 +60,15 @@ df_joined = df2.join(csv_df, on="Plot_ID", lsuffix="_left", rsuffix="_right")
 ################################################
 # load s2 raster image
 # image from 2026-06-22 10:36
-# load as gpkg?
-# > gdal_translate -of GPKG <input-file>.tif <output-file>.gpkg
+# > gdal_translate -of GPKG <input-file>.tif <output-file>.gpkg # <-- only works for up to 4 bands...
 sat_date = date(2026, 6, 22)
 fp = Path("/home/feds/projects/fieldmeasurements/data/s2/Sentinel2_2026-06-23.tif")
-scale_val = 10_000 # todo adapt L2A refl scale to c1,c2 formula in https://sentiwiki.copernicus.eu/web/s2-products#:~:text=L2A%5FSRi%20%3D%20%28L2A%5FDNi%20%2B%20BOA%5FADD%5FOFFSETi%29%20%2F%20QUANTIFICATION%5FVALUE
+# scale_val = 10_000 # todo adapt L2A refl scale to c1,c2 formula in https://sentiwiki.copernicus.eu/web/s2-products#:~:text=L2A%5FSRi%20%3D%20%28L2A%5FDNi%20%2B%20BOA%5FADD%5FOFFSETi%29%20%2F%20QUANTIFICATION%5FVALUE
 
 gdf = gpd.GeoDataFrame(df_joined, geometry="geometry")
 
 with rio.open(fp) as src:
-    # extract values for centroid points
+    # unify crs
     if gdf.crs != src.crs:
         gdf = gdf.to_crs(src.crs)
     
@@ -84,10 +83,12 @@ with rio.open(fp) as src:
     # plt.show()
 
     # Prepare a list of (x, y) coordinates
-    coords = [(x, y) for x, y in zip(gdf.geometry.x, gdf.geometry.y)]
+    # adapted to gdf.geometry.centroid.xy
+    coords = [(x, y) for x, y in zip(gdf.geometry.centroid.x, gdf.geometry.centroid.y)]
 
     # Sample the raster at all points
-    samples = list(src.sample(coords)) # assuming this returns band samples in order of bands
+    # - extract values for centroid points
+    samples = list(src.sample(coords)) # assuming sample returns band samples in order of bands
 
     results = []
     for s in samples:
