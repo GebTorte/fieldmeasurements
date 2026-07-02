@@ -5,28 +5,32 @@ import pandas as pd
 import polars as pl
 import matplotlib.pyplot as plt
 
-# 1 load s2 raster image
-fp = Path("/home/feds/projects/fieldmeasurements/data/s2/Sentinel2_2026-06-23.tif")
-scale_val = 10_000 # todo adapt L2A refl scale to c1,c2 formula in https://sentiwiki.copernicus.eu/web/s2-products#:~:text=L2A%5FSRi%20%3D%20%28L2A%5FDNi%20%2B%20BOA%5FADD%5FOFFSETi%29%20%2F%20QUANTIFICATION%5FVALUE
 
-with rio.open(fp) as dataset:
-    r = b4 = dataset.read(1).astype('float64') /scale_val# r
-    g = b3 = dataset.read(2).astype('float64') /scale_val# g
-    b = b2 = dataset.read(3).astype('float64') /scale_val# b
-    nir = b8 = dataset.read(4).astype('float64') /scale_val# nir
-    redge = b5 = dataset.read(5).astype('float64') /scale_val
+def calc_indices_for_sample(lst: list):
+    """
+    samples in order of bands
+    r     - 1
+    g     - 2
+    b     - 3
+    nir   - 4
+    redge - 5
+    """
+    r, g, b, nir, redge = lst
 
     # 1.1 calc indices for selected pixels
-    ndvi = (b8 - b4) / (b8 + b4 + 1e-8) # avoid division by zero
+    ndvi = (nir - r) / (nir + r + 1e-8) # avoid division by zero
     evi = 2.5 * (nir - r) / (nir + 6 * r - 7.5 * b + 1)
     mcari = ((redge - r) - 0.2 * (redge - g)) * (redge / r) # (Modified Chlorophyll Absorption in Reflectance Index) 
+    
     # todo add biomass estimate index
 
-    # 1.2 add arrays back to tif, or keep if they have spatial/pixel info
+    return {
+        "ndvi": ndvi,
+        "evi": evi,
+        "mcari": mcari
+    }
 
-# preview ndvi
-plt.imshow(ndvi, "Greens")
-plt.show()
+
 
 # 2 load data from Daniel (point/pixel id?) 
 # file format gpkg or csv?
@@ -46,18 +50,63 @@ df2 = pd.DataFrame(df)
 # todo: assign pixel to measurement and id
 csv_fp = Path("./data/Grassland_fixed.csv")
 csv_df = pd.read_csv(csv_fp)[1:] # skip nan row
-csv_df["Plot_ID"] = csv_df["Plot ID"]
+csv_df["Plot_ID"] = csv_df["Plot ID"] # rename
+
 df_joined = df2.join(csv_df, on="Plot_ID", lsuffix="_left", rsuffix="_right")
 # or 
 #df = pd.read_csv(df_fp)
 # 2.1.1 transform df to gdf via gpd.points_from_xy(df.Long, df.Lat)
 # 2.1.2 or find a way to (inner) join
 
-df_joined.sort_values("Plot_ID")
+#view sorted
+# df_joined.sort_values("Plot_ID")
 
 # 3 extract s2 pixels corresponding to sample points
 
 # 4 export as pd dataframe for easy visualization
-df_joined = pd.DataFrame()
+
 df_joined.to_parquet("./data/processed/df_combined.parquet")
 df_joined.to_csv("./data/processed/df_combined.csv")
+
+################################################
+# load s2 raster image
+# image from 2026-06-22 10:36
+# load as gpkg?
+# > gdal_translate -of GPKG <input-file>.tif <output-file>.gpkg
+fp = Path("/home/feds/projects/fieldmeasurements/data/s2/Sentinel2_2026-06-23.tif")
+scale_val = 10_000 # todo adapt L2A refl scale to c1,c2 formula in https://sentiwiki.copernicus.eu/web/s2-products#:~:text=L2A%5FSRi%20%3D%20%28L2A%5FDNi%20%2B%20BOA%5FADD%5FOFFSETi%29%20%2F%20QUANTIFICATION%5FVALUE
+
+
+gdf = gpd.GeoDataFrame(df_joined, geometry="geometry")
+
+with rio.open(fp) as src:
+    # extract values for centroid points
+    if gdf.crs != src.crs:
+        gdf = gdf.to_crs(src.crs)
+
+    
+    #r = b4 = src.read(1).astype('float64') #/scale_val# r
+    #g = b3 = src.read(2).astype('float64') #/scale_val# g
+    #b = b2 = src.read(3).astype('float64') #/scale_val# b
+    #nir = b8 = src.read(4).astype('float64') #/scale_val# nir
+    #redge = b5 = src.read(5).astype('float64') #/scale_val
+
+    # preview ndvi
+    # plt.imshow(ndvi, "Greens")
+    # plt.show()
+
+    # Prepare a list of (x, y) coordinates
+    coords = [(x, y) for x, y in zip(gdf.geometry.x, gdf.geometry.y)]
+
+    # Sample the raster at all points
+    samples = list(src.sample(coords)) # assuming this returns band samples in order of bands
+
+    results = []
+    for s in samples:
+        results.append(calc_indices_for_sample(s))
+
+    gdf['ndvi'] = [r['ndvi'] for r in results]
+    gdf['evi']  = [r['evi'] for r in results]
+    gdf['mcari'] = [r['mcari'] for r in results]
+
+gdf.to_file("./data/processed/results.gpkg")
