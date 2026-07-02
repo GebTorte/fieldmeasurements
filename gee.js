@@ -8,7 +8,6 @@ var myField = geometry;
 
 // Enter the target fieldwork date here (YYYY-MM-DD)
 var targetDateStr = '2026-06-23'; 
-var targetDateStr2 = '2026-06-24'; 
 
 /////////////////////////////////////////////////////////////////////////////////////
 // Maximum allowable cloud cover for the scene (%)
@@ -50,7 +49,7 @@ var withTimeDiff = s2Collection.map(function(img) {
 
 var bestImage = withTimeDiff.sort('time_dist').first();
 
-////Resample B5 20m to 10m
+//// Resample B5 from 20m to 10m using bilinear interpolation
 var b5_10m = bestImage.select('B5')
     .resample('bilinear')
     .reproject({
@@ -58,8 +57,8 @@ var b5_10m = bestImage.select('B5')
       scale: 10
     });
     
-// Select only the required bands for QGIS (10-meter resolution: Blue, Green, Red, NIR)
-var exportImage = bestImage.select(['B4', 'B3', 'B2', 'B8', 'B5']);
+// Correctly select 10m bands and attach the upsampled 10m B5 band
+var exportImage = bestImage.select(['B4', 'B3', 'B2', 'B8']).addBands(b5_10m);
 
 // =========================================================================
 // 4. PRINT INFORMATION TO THE CONSOLE
