@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 import polars as pl
 import matplotlib.pyplot as plt
+from datetime import date
 
 
 def calc_indices_for_sample(lst: list):
@@ -36,18 +37,9 @@ def calc_indices_for_sample(lst: list):
 # file format gpkg or csv?
 df_fp = Path("./data/wrzburg_s2_grid_centroid.gpkg")
 df = gpd.read_file(df_fp).dropna()
+df2 = pd.DataFrame(df)# convert to pd for joining
 
-# check where we are
-df.plot()
-
-# convert to pd
-df2 = pd.DataFrame(df)
-
-#df_aoi_bib = df[3:5]
-#df_aoi_hoechberg = df[12:16]
-#df_aoi_bib.plot()
-
-# todo: assign pixel to measurement and id
+# fix csv by opening in libre office excel and exporting as csv again
 csv_fp = Path("./data/Grassland_fixed.csv")
 csv_df = pd.read_csv(csv_fp)[1:] # skip nan row
 csv_df["Plot_ID"] = csv_df["Plot ID"] # rename
@@ -61,21 +53,18 @@ df_joined = df2.join(csv_df, on="Plot_ID", lsuffix="_left", rsuffix="_right")
 #view sorted
 # df_joined.sort_values("Plot_ID")
 
-# 3 extract s2 pixels corresponding to sample points
-
-# 4 export as pd dataframe for easy visualization
-
-df_joined.to_parquet("./data/processed/df_combined.parquet")
-df_joined.to_csv("./data/processed/df_combined.csv")
+# optionally save 
+#df_joined.to_parquet("./data/processed/df_combined.parquet")
+#df_joined.to_csv("./data/processed/df_combined.csv")
 
 ################################################
 # load s2 raster image
 # image from 2026-06-22 10:36
 # load as gpkg?
 # > gdal_translate -of GPKG <input-file>.tif <output-file>.gpkg
+sat_date = date(2026, 6, 22)
 fp = Path("/home/feds/projects/fieldmeasurements/data/s2/Sentinel2_2026-06-23.tif")
 scale_val = 10_000 # todo adapt L2A refl scale to c1,c2 formula in https://sentiwiki.copernicus.eu/web/s2-products#:~:text=L2A%5FSRi%20%3D%20%28L2A%5FDNi%20%2B%20BOA%5FADD%5FOFFSETi%29%20%2F%20QUANTIFICATION%5FVALUE
-
 
 gdf = gpd.GeoDataFrame(df_joined, geometry="geometry")
 
@@ -83,7 +72,6 @@ with rio.open(fp) as src:
     # extract values for centroid points
     if gdf.crs != src.crs:
         gdf = gdf.to_crs(src.crs)
-
     
     #r = b4 = src.read(1).astype('float64') #/scale_val# r
     #g = b3 = src.read(2).astype('float64') #/scale_val# g
@@ -109,4 +97,5 @@ with rio.open(fp) as src:
     gdf['evi']  = [r['evi'] for r in results]
     gdf['mcari'] = [r['mcari'] for r in results]
 
-gdf.to_file("./data/processed/results.gpkg")
+# export to file
+gdf.to_file(f"./data/processed/results_{sat_date}.gpkg")
