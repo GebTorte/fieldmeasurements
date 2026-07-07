@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from datetime import date
 
 
-def calc_indices_for_sample(lst: list, e:float = 1e8):
+def calc_indices_for_sample(lst: list, e:float = 1e-8):
     """
     samples in order of bands
     r     - 1
@@ -60,12 +60,19 @@ df_joined = df2.join(csv_df, on="Plot_ID", lsuffix=lsuffix, rsuffix=rsuffix)
 # image from 2026-06-22 10:36
 # > gdal_translate -of GPKG <input-file>.tif <output-file>.gpkg # <-- only works for up to 4 bands...
 sat_date = date(2026, 6, 22)
+
 sample_dates = [date(2026, 6, 23), date(2026, 6, 24)]
 fp = Path("/home/feds/projects/fieldmeasurements/data/s2/Sentinel2_2026-06-23.tif")
 # scale_val = 10_000 # todo adapt L2A refl scale to c1,c2 formula in https://sentiwiki.copernicus.eu/web/s2-products#:~:text=L2A%5FSRi%20%3D%20%28L2A%5FDNi%20%2B%20BOA%5FADD%5FOFFSETi%29%20%2F%20QUANTIFICATION%5FVALUE
 
 # back to gdf
 gdf = gpd.GeoDataFrame(df_joined, geometry="geometry")
+
+#sample_dates = [sampling_date] # todo fix this with a mapping of sampling_date: satellite_date, to avoid having multiple of the same sat imgs
+    # or select nearest sat img for sampling
+#dt_sample_dates = [pd.to_datetime(d, format="%Y-%m-%d")  for d in sample_dates] # convert for comparison
+# back to gdf
+#gdf = gpd.GeoDataFrame(df, geometry="geometry")
 
 # filter for date-relevant plot ids
 gdf = gdf[gdf[f"Plot_ID{rsuffix}"].isin(range(132, 142))]
