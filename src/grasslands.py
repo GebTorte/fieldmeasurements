@@ -2,11 +2,10 @@ import geopandas as gpd
 import rasterio as rio
 from pathlib import Path
 import pandas as pd
-import matplotlib.pyplot as plt
 from datetime import date
 
 
-def calc_indices_for_sample(lst: list, e:float = 1e-8):
+def calc_indices_for_sample(lst: list, e: float = 1e-8):
     """
     samples in order of bands
     r     - 1
@@ -68,17 +67,17 @@ fp = Path("/home/feds/projects/fieldmeasurements/data/s2/Sentinel2_2026-06-23.ti
 # back to gdf
 gdf = gpd.GeoDataFrame(df_joined, geometry="geometry")
 
-#sample_dates = [sampling_date] # todo fix this with a mapping of sampling_date: satellite_date, to avoid having multiple of the same sat imgs
-    # or select nearest sat img for sampling
-#dt_sample_dates = [pd.to_datetime(d, format="%Y-%m-%d")  for d in sample_dates] # convert for comparison
+# sample_dates = [sampling_date] # todo fix this with a mapping of sampling_date: satellite_date, to avoid having multiple of the same sat imgs
+# or select nearest sat img for sampling
+# dt_sample_dates = [pd.to_datetime(d, format="%Y-%m-%d")  for d in sample_dates] # convert for comparison
 # back to gdf
-#gdf = gpd.GeoDataFrame(df, geometry="geometry")
+# gdf = gpd.GeoDataFrame(df, geometry="geometry")
 
 # filter for date-relevant plot ids
 gdf = gdf[gdf[f"Plot_ID{rsuffix}"].isin(range(132, 142))]
 # or filter for dates (first clean csv dates...)
-#gdf["Date"] = pd.to_datetime(gdf["Date"], format="%d.%m.%Y")
-#gdf = gdf[gdf["Date"].isin(sample_dates)]
+# gdf["Date"] = pd.to_datetime(gdf["Date"], format="%d.%m.%Y")
+# gdf = gdf[gdf["Date"].isin(sample_dates)]
 
 with rio.open(fp) as src:
     # unify crs
